@@ -333,6 +333,75 @@ diff --ruN a/stablehlo/stablehlo/tests/interpret/chlo/ragged_dot.mlir b/stablehl
 +  ]> : tensor<2x11x7xf32>
 +  func.return
 +}
+diff --ruN a/stablehlo/stablehlo/tests/ops_stablehlo.mlir b/stablehlo/stablehlo/tests/ops_stablehlo.mlir
+--- stablehlo/stablehlo/tests/ops_stablehlo.mlir
++++ stablehlo/stablehlo/tests/ops_stablehlo.mlir
+@@ -1775,6 +1775,30 @@
+   // expected-error@+1 {{'precision_config' failed to satisfy constraint}}
+   %0 = "stablehlo.dot"(%arg0, %arg1) {precision_config = ["FOO", #stablehlo<precision HIGHEST>]} : (tensor<2x2xi32>, tensor<2x2xi32>) -> tensor<2x2xi32>
+   func.return %0: tensor<2x2xi32>
++}
++
++// -----
++
++// CHECK-LABEL: func @exponential_result_accuracy
++func.func @exponential_result_accuracy(%arg0: tensor<f32>) -> tensor<f32> {
++  %0 = "stablehlo.exponential"(%arg0) {result_accuracy = #stablehlo.result_accuracy<atol = 0.0, rtol = 0.0, ulps = 0, mode = #stablehlo.result_accuracy_mode<DEFAULT>>} : (tensor<f32>) -> tensor<f32>
++  func.return %0: tensor<f32>
++}
++
++// -----
++
++// CHECK-LABEL: func @exponential_result_accuracy_tol
++func.func @exponential_result_accuracy_tol(%arg0: tensor<f32>) -> tensor<f32> {
++  %0 = "stablehlo.exponential"(%arg0) {result_accuracy = #stablehlo.result_accuracy<atol = 1.0, rtol = 0.0, ulps = 4, mode = #stablehlo.result_accuracy_mode<TOLERANCE>>} : (tensor<f32>) -> tensor<f32>
++  func.return %0: tensor<f32>
++}
++
++// -----
++
++func.func @exponential_result_accuracy_tol(%arg0: tensor<f32>) -> tensor<f32> {
++  // expected-error@+1 {{Invalid tolerances for ResultAccuracyAttr with mode HIGHEST, must be all zero.}}
++  %0 = "stablehlo.exponential"(%arg0) {result_accuracy = #stablehlo.result_accuracy<atol = 1.0, rtol = 0.0, ulps = 4, mode = #stablehlo.result_accuracy_mode<HIGHEST>>} : (tensor<f32>) -> tensor<f32>
++  func.return %0: tensor<f32>
+ }
+ 
+ // -----
+diff --ruN a/stablehlo/stablehlo/tests/ops_stablehlo_roundtrip.mlir b/stablehlo/stablehlo/tests/ops_stablehlo_roundtrip.mlir
+--- stablehlo/stablehlo/tests/ops_stablehlo_roundtrip.mlir
++++ stablehlo/stablehlo/tests/ops_stablehlo_roundtrip.mlir
+@@ -766,6 +766,11 @@
+   func.return %0 : tensor<3x4xf32>
+ }
+ 
++func.func @test_unary_result_accuracy(%arg0: tensor<2xf32>) -> tensor<2xf32> {
++  %exp = "stablehlo.exponential"(%arg0) {result_accuracy = #stablehlo.result_accuracy<atol = 1.000000e+00, rtol = 1.000000e+00, ulps = 5, mode = #stablehlo.result_accuracy_mode<TOLERANCE>>} : (tensor<2xf32>) -> tensor<2xf32>
++  func.return %exp : tensor<2xf32>
++}
++
+ func.func @test_unary_round_nearest_even(%arg0: tensor<2xf32>) -> tensor<2xf32> {
+     %0 = "stablehlo.round_nearest_even"(%arg0) {} : (tensor<2xf32>) -> tensor<2xf32>
+     func.return %0 : tensor<2xf32>
+diff --ruN a/stablehlo/stablehlo/tests/print_stablehlo.mlir b/stablehlo/stablehlo/tests/print_stablehlo.mlir
+--- stablehlo/stablehlo/tests/print_stablehlo.mlir
++++ stablehlo/stablehlo/tests/print_stablehlo.mlir
+@@ -406,3 +406,16 @@
+   %slice6 = stablehlo.slice %arg0 [1:3:1, 4:8:2] : (tensor<3x8xf32>) -> tensor<2x2xf32>
+   return %slice1, %slice2, %slice3, %slice4, %slice5, %slice6 : tensor<1xf32>, tensor<2xf32>, tensor<1xf32>, tensor<1xf32>, tensor<2x2xf32>, tensor<2x2xf32>
+ }
++
++func.func @result_accuracy_default() -> () attributes {
++  // CHECK: mode.default = #stablehlo.result_accuracy<mode = #stablehlo.result_accuracy_mode<DEFAULT>>
++  // CHECK: mode.highest = #stablehlo.result_accuracy<mode = #stablehlo.result_accuracy_mode<HIGHEST>>
++  // CHECK: mode.tolerance_full = #stablehlo.result_accuracy<atol = 1.000000e-05, rtol = 1.000000e-04, ulps = 2, mode = #stablehlo.result_accuracy_mode<TOLERANCE>>
++  // CHECK: mode.tolerance_partial = #stablehlo.result_accuracy<atol = 1.000000e-05, mode = #stablehlo.result_accuracy_mode<TOLERANCE>>
++  mode.default = #stablehlo.result_accuracy<atol = 0.0, rtol = 0.0, ulps = 0, mode = #stablehlo.result_accuracy_mode<DEFAULT>>,
++  mode.highest = #stablehlo.result_accuracy<atol = 0.0, rtol = 0.0, ulps = 0, mode = #stablehlo.result_accuracy_mode<HIGHEST>>,
++  mode.tolerance_full = #stablehlo.result_accuracy<atol = 1.0e-5, rtol = 1.0e-4, ulps = 2, mode = #stablehlo.result_accuracy_mode<TOLERANCE>>,
++  mode.tolerance_partial = #stablehlo.result_accuracy<atol = 1.0e-5, rtol = 0.0, ulps = 0, mode = #stablehlo.result_accuracy_mode<TOLERANCE>>
++} {
++  func.return
++}
 diff --ruN a/stablehlo/stablehlo/tests/transforms/stablehlo_refine_parameters.mlir b/stablehlo/stablehlo/tests/transforms/stablehlo_refine_parameters.mlir
 --- stablehlo/stablehlo/tests/transforms/stablehlo_refine_parameters.mlir
 +++ stablehlo/stablehlo/tests/transforms/stablehlo_refine_parameters.mlir
@@ -616,6 +685,36 @@ diff --ruN a/stablehlo/stablehlo/transforms/ChloLegalizeToStablehlo.cpp b/stable
  }
  }  // namespace
  
+diff --ruN a/stablehlo/stablehlo/transforms/StablehloComplexMathExpanderPatterns.td b/stablehlo/stablehlo/transforms/StablehloComplexMathExpanderPatterns.td
+--- stablehlo/stablehlo/transforms/StablehloComplexMathExpanderPatterns.td
++++ stablehlo/stablehlo/transforms/StablehloComplexMathExpanderPatterns.td
+@@ -683,12 +683,15 @@
+ //     Notice that for `y != 0`, neither `cos(y)` nor `sin(y)` is never
+ //     zero on the set of floating point numbers.
+ //
+-def ExpOp_ComplexElementType_ComplexMathExpander: Pat<(StableHLO_ExpOp ComplexElementType:$z),
++def ConstDefaultResultAccuracyAttr :
++  ConstantAttr<StableHLO_ResultAccuracyAttr, "::mlir::stablehlo::ResultAccuracyMode::DEFAULT">;
++
++def ExpOp_ComplexElementType_ComplexMathExpander: Pat<(StableHLO_ExpOp ComplexElementType:$z, ConstDefaultResultAccuracyAttr),
+   (StableHLO_ComplexOp
+     (StableHLO_SelectOp
+       (StableHLO_CompareOp:$eq_e_constant_posinf
+        (StableHLO_ExpOp:$e
+-         (StableHLO_RealOp:$x $z)),
++         (StableHLO_RealOp:$x $z), ConstDefaultResultAccuracyAttr),
+        (StableHLO_ConstantLikePosInfValue $x),
+         StableHLO_ComparisonDirectionValue<"EQ">,
+         (STABLEHLO_DEFAULT_COMPARISON_TYPE)),
+@@ -697,7 +700,7 @@
+           (StableHLO_ExpOp:$e2
+             (StableHLO_MulOp
+               $x,
+-              (StableHLO_ConstantLike<"0.5"> $x))),
++              (StableHLO_ConstantLike<"0.5"> $x)), ConstDefaultResultAccuracyAttr),
+           (StableHLO_CosineOp:$cs
+             (StableHLO_ImagOp:$y $z))),
+         $e2),
 diff --ruN a/stablehlo/stablehlo/transforms/StablehloRefineArguments.cpp b/stablehlo/stablehlo/transforms/StablehloRefineArguments.cpp
 --- stablehlo/stablehlo/transforms/StablehloRefineArguments.cpp
 +++ stablehlo/stablehlo/transforms/StablehloRefineArguments.cpp
