@@ -197,6 +197,24 @@ class PyClient {
                                   absl::Span<Shape const> operand_shapes,
                                   absl::Span<Shape const> result_shapes);
 
+  // `GetEmitPythonCallback` takes in an input Python callable. It returns a
+  // pair of a `uint64_t` descriptor and a Python object whose reference will
+  // keep the Python callback alive. The descriptor should be passed into a
+  // 'xla_ffi_python_cpu_callback' or 'xla_ffi_python_gpu_callback' FFI handler
+  // as its first argument. Typically the callback may be kept alive by
+  // attaching the keep-alive object to the executable built from this
+  // computation.
+  //
+  // The callable receives as arguments NumPy arrays for arguments with array
+  // types, and None for Token argument. The callable must return a tuple of
+  // either arrays or None values.
+  //
+  // NOTE(dsuo): This is a temporary API to support the migration of Python
+  // callbacks to FFI. Eventually, this method should only return the callback
+  // capsule since the descriptor won't be needed.
+  absl::StatusOr<std::pair<uint64_t, nanobind::object>> GetEmitPythonCallback(
+      nanobind::callable callable);
+
   // `MakePythonCallbackUsingHostSendAndRecv` takes in an input Python callable
   // that takes in arguments of shapes `operand_shapes` and returns results of
   // shapes `result_shapes`. The arguments correspond to Send ops in the HLO

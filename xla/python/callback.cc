@@ -35,12 +35,13 @@ limitations under the License.
 #include "absl/types/span.h"
 #include "nanobind/nanobind.h"
 #include "nanobind/stl/string_view.h"  // IWYU pragma: keep
+#include "xla/ffi/api/ffi.h"
+#include "xla/ffi/ffi_api.h"
 #include "xla/pjrt/transpose.h"
 #include "xla/primitive_util.h"
 #include "xla/python/nb_numpy.h"
 #include "xla/python/python_ref_manager.h"
 #include "xla/service/custom_call_status.h"
-#include "tsl/platform/statusor.h"
 
 namespace nb = nanobind;
 
@@ -123,6 +124,7 @@ absl::StatusOr<nb::tuple> CpuCallback::Call(nb::tuple args) {
   } catch (nb::python_error& e) {
     return py_error_to_status(e);
   }
+
   if (!PyTuple_Check(result_object.ptr())) {
     return absl::InternalError(
         absl::StrFormat("CPU callback expected a tuple result, got %s",
@@ -166,6 +168,113 @@ absl::StatusOr<nb::tuple> CpuCallback::Call(nb::tuple args) {
   return result_tuple;
 }
 
+absl::Status CpuCallback::FfiPrepareAndCall(ffi::RemainingRets rets,
+                                            ffi::RemainingArgs args) {
+  nb::gil_scoped_acquire gil;
+  nb::tuple nb_args = nb::steal<nb::tuple>(PyTuple_New(args.size()));
+
+  for (size_t i = 0; i < args.size(); ++i) {
+    auto arg = args.get<ffi::AnyBuffer>(i);
+    auto dtype = arg->element_type();
+    if (dtype == xla::ffi::TOKEN) {
+      PyTuple_SET_ITEM(nb_args.ptr(), i, nb::none().release().ptr());
+    } else {
+      auto dims = absl::Span<const int64_t>(arg->dimensions().begin(),
+                                            arg->dimensions().size());
+      nb_numpy_ndarray array = nb_numpy_ndarray(
+          nb_dtype(xla::ffi::ToString(dtype)), dims, arg->strides(),
+          const_cast<void*>(
+              args.get<ffi::AnyBuffer>(i).value().untyped_data()));
+      array.attr("flags").attr("writeable") = nb::bool_(false);
+      PyTuple_SET_ITEM(nb_args.ptr(), i, array.release().ptr());
+    }
+  }
+
+  TF_ASSIGN_OR_RETURN(auto result_tuple, FfiCall(rets, std::move(nb_args)));
+
+  for (size_t i = 0; i < rets.size(); ++i) {
+    auto ret = rets.get<ffi::AnyBuffer>(i);
+    auto dtype = ret.value()->element_type();
+    if (dtype == xla::ffi::TOKEN) {
+      continue;
+    }
+    nb::object output =
+        nb::borrow<nb::object>(PyTuple_GetItem(result_tuple.ptr(), i));
+    nb_numpy_ndarray array = nb_numpy_ndarray::ensure(std::move(output));
+    absl::Span<int64_t const> dims(
+        reinterpret_cast<const int64_t*>(array.shape()), array.ndim());
+    absl::Span<int64_t const> strides(
+        reinterpret_cast<const int64_t*>(array.strides()), array.ndim());
+    // TODO(dsuo): What if we don't get the expected stride?
+    std::memcpy(rets.get<ffi::AnyBuffer>(i).value()->untyped_data(),
+                array.data(), ret.value()->size_bytes());
+  }
+
+  return absl::OkStatus();
+}
+
+absl::StatusOr<nb::tuple> CpuCallback::FfiCall(ffi::RemainingRets rets,
+                                               nb::tuple args) {
+  auto py_error_to_status = [](nb::python_error& e) {
+    std::string error_message = e.what();
+    return absl::InternalError(
+        absl::StrFormat("CpuCallback error: %s", error_message));
+  };
+  nb::object result_object;
+  try {
+    result_object = callable_(*nb::borrow<nb::args>(args));
+  } catch (nb::python_error& e) {
+    return py_error_to_status(e);
+  }
+
+  if (!PyTuple_Check(result_object.ptr())) {
+    return absl::InternalError(
+        absl::StrFormat("CPU callback expected a tuple result, got %s",
+                        nb::cast<absl::string_view>(nb::repr(result_object))));
+  }
+  if (PyTuple_Size(result_object.ptr()) != rets.size()) {
+    return absl::InternalError(
+        absl::StrFormat("CPU callback expected a tuple with %d results, got %d",
+                        results_.size(), PyTuple_Size(result_object.ptr())));
+  }
+
+  nb::tuple result_tuple = nb::cast<nb::tuple>(result_object);
+  for (size_t i = 0; i < rets.size(); ++i) {
+    nb::object output =
+        nb::borrow<nb::object>(PyTuple_GetItem(result_tuple.ptr(), i));
+    auto ret = rets.get<ffi::AnyBuffer>(i);
+    auto dtype = ret.value()->element_type();
+    if (dtype == xla::ffi::TOKEN) {
+      if (!output.is_none()) {
+        return absl::InternalError(absl::StrFormat(
+            "Token output from Python callback should be None, got %s",
+            nb::cast<absl::string_view>(nb::repr(output))));
+      }
+      continue;
+    }
+    nb_numpy_ndarray array;
+    try {
+      array = nb_numpy_ndarray::from_any(output, NPY_ARRAY_ENSUREARRAY);
+    } catch (nb::python_error& e) {
+      return py_error_to_status(e);
+    }
+    static_assert(sizeof(ssize_t) == sizeof(int64_t),
+                  "Expected ssize_t to be of equal size to int64_t");
+    absl::Span<int64_t const> dims(
+        reinterpret_cast<const int64_t*>(array.shape()), array.ndim());
+    auto expected_dims = absl::Span<const int64_t>(
+        ret.value()->dimensions().begin(), ret.value()->dimensions().size());
+    if (dims != expected_dims) {
+      return absl::InternalError(absl::StrFormat(
+          "Mismatched result shape for %d-th return value from CPU callback; "
+          "expected array with dimensions %s, got %s",
+          i, absl::StrJoin(results_[i].expected_dims, ","),
+          absl::StrJoin(dims, ",")));
+    }
+  }
+  return result_tuple;
+}
+
 void XlaPythonCpuCallback(void* output, void** inputs,
                           XlaCustomCallStatus* status) {
   CpuCallback* callback =
@@ -176,5 +285,27 @@ void XlaPythonCpuCallback(void* output, void** inputs,
     XlaCustomCallStatusSetFailure(status, msg.data(), msg.length());
   }
 }
+
+ffi::Error XlaFfiPythonCpuCallbackImpl(uint64_t descriptor,
+                                       ffi::RemainingArgs args,
+                                       ffi::RemainingRets rets) {
+  CpuCallback* callback =
+      absl::bit_cast<CpuCallback*>(static_cast<uintptr_t>(descriptor));
+  auto s = callback->FfiPrepareAndCall(rets, args);
+  if (!s.ok()) {
+    auto msg = s.message();
+    return ffi::Error::Internal({msg.data(), msg.size()});
+  }
+  return ffi::Error::Success();
+}
+
+XLA_FFI_DEFINE_HANDLER_SYMBOL(XlaFfiPythonCpuCallback,
+                              XlaFfiPythonCpuCallbackImpl,
+                              ffi::Ffi::Bind()
+                                  .Attr<uint64_t>("descriptor")
+                                  .RemainingArgs()
+                                  .RemainingRets());
+XLA_FFI_REGISTER_HANDLER(ffi::GetXlaFfiApi(), "xla_ffi_python_cpu_callback",
+                         "Host", XlaFfiPythonCpuCallback);
 
 }  // namespace xla

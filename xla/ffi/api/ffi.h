@@ -471,6 +471,18 @@ class AnyBuffer {
 
   Dimensions dimensions() const { return Dimensions(buf_->dims, buf_->rank); }
 
+  // TODO(dsuo): This is a hack.
+  std::vector<int64_t> strides() const {
+    std::vector<int64_t> strides(dimensions().size(),
+                                 ByteWidth(element_type()));
+    if (dimensions().size() > 1) {
+      for (int64_t i = dimensions().size() - 2; i >= 0; --i) {
+        strides[i] = dimensions()[i + 1] * strides[i + 1];
+      }
+    }
+    return strides;
+  }
+
   XLA_FFI_ATTRIBUTE_ALWAYS_INLINE size_t size_bytes() const {
     return ByteWidth(element_type()) * element_count();
   }
@@ -543,6 +555,49 @@ XLA_FFI_REGISTER_DATATYPE_MAPPING(DataType::TOKEN, void);
 inline constexpr size_t kDynamicRank = std::numeric_limits<size_t>::max();
 
 }  // namespace internal
+
+// TODO(dsuo): Perhaps there's a less round-about way to get an xla::nb_dtype
+// from a DataType.
+constexpr std::string_view ToString(DataType dtype) {
+  switch (dtype) {
+    case DataType::PRED:
+      return "bool";
+    case DataType::U8:
+      return "uint8";
+    case DataType::U16:
+      return "uint16";
+    case DataType::U32:
+      return "uint32";
+    case DataType::U64:
+      return "uint64";
+    case DataType::S8:
+      return "int8";
+    case DataType::S16:
+      return "int16";
+    case DataType::S32:
+      return "int32";
+    case DataType::S64:
+      return "int64";
+    case DataType::F16:
+      return "float16";
+    case DataType::F32:
+      return "float32";
+    case DataType::F64:
+      return "float64";
+    // TODO(dsuo): Not sure if bfloat16 will fail.
+    case DataType::BF16:
+      return "bfloat16";
+    case DataType::C64:
+      return "complex64";
+    case DataType::C128:
+      return "complex128";
+    // TODO(dsuo): We shouldn't be passing tokens to xla::nb_dtype.
+    case DataType::TOKEN:
+      return "token";
+    default:
+      return "INVALID";
+  }
+}
 
 constexpr DataType ToComplex(DataType dtype) {
   switch (dtype) {
