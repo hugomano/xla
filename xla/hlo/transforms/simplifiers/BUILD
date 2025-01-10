@@ -48,7 +48,6 @@ xla_cc_test(
     deps = [
         ":hlo_constant_splitter",
         ":hlo_dce",
-        "//xla:test",
         "//xla:util",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/parser:hlo_parser",
@@ -119,8 +118,6 @@ xla_cc_test(
     srcs = ["broadcast_canonicalizer_test.cc"],
     deps = [
         ":broadcast_canonicalizer",
-        "//xla:test",
-        "//xla:test_helpers",
         "//xla/hlo/testlib:hlo_hardware_independent_test_base",
         "@com_google_googletest//:gtest_main",  # fixdeps: keep
     ],
@@ -155,7 +152,6 @@ xla_cc_test(
     deps = [
         ":bfloat16_conversion_folding",
         "//xla:shape_util",
-        "//xla:test",
         "//xla:test_helpers",
         "//xla:xla_data_proto_cc",
         "//xla/hlo/ir:hlo",
@@ -243,7 +239,6 @@ xla_cc_test(
         ":hlo_computation_deduplicator",
         "//xla:literal_util",
         "//xla:shape_util",
-        "//xla:test",
         "//xla:xla_data_proto_cc",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/testlib:hlo_hardware_independent_test_base",
@@ -279,7 +274,6 @@ xla_cc_test(
         "//xla:comparison_util",
         "//xla:literal_util",
         "//xla:shape_util",
-        "//xla:test",
         "//xla:util",
         "//xla:xla_data_proto_cc",
         "//xla/hlo/ir:hlo",
@@ -959,9 +953,8 @@ xla_cc_test(
 #         "@com_google_googletest//:gtest",
 #         "@com_google_googletest//:gtest_main",
 #         "@com_google_absl//absl/strings:str_format",
-#         "//xla:test",
 #         "//xla/hlo/testlib:hlo_hardware_independent_test_base",
-#         "@tsl//tsl/platform:statusor",
+#         "//xla/tsl/platform:statusor",
 #     ],
 # )
 # copybara:uncomment_end
@@ -1063,7 +1056,6 @@ xla_cc_test(
         ":zero_sized_hlo_elimination",
         "//xla:literal_util",
         "//xla:shape_util",
-        "//xla:test",
         "//xla:xla_data_proto_cc",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/testlib:hlo_hardware_independent_test_base",
@@ -1241,8 +1233,6 @@ xla_cc_test(
     deps = [
         ":optimize_input_output_buffer_alias",
         "//xla:shape_util",
-        "//xla:test",
-        "//xla:test_helpers",
         "//xla:xla_data_proto_cc",
         "//xla/hlo/ir:hlo",
         "//xla/hlo/testlib:hlo_hardware_independent_test_base",
@@ -1431,7 +1421,6 @@ xla_cc_test(
     srcs = ["reduce_window_rewriter_test.cc"],
     deps = [
         ":reduce_window_rewriter",
-        "//xla:test",
         "//xla:xla_data_proto_cc",
         "//xla/hlo/testlib:hlo_hardware_independent_test_base",
         "@com_google_absl//absl/strings",
