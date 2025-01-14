@@ -3635,7 +3635,6 @@ cc_library(
         "//xla:lazy",
         "//xla:shape_tree",
         "//xla:shape_util",
-        "//xla:types",
         "//xla:util",
         "//xla:xla_data_proto_cc",
         "//xla/hlo/ir:hlo",
@@ -3646,7 +3645,6 @@ cc_library(
         "@com_google_absl//absl/strings",
         "@com_google_absl//absl/strings:str_format",
         "@com_google_absl//absl/types:span",
-        "@tsl//tsl/platform:errors",
         "@tsl//tsl/platform:logging",
     ],
 )
