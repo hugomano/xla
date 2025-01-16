@@ -233,6 +233,7 @@ DebugOptions DefaultDebugOptionsIgnoringFlags() {
   opts.set_xla_gpu_exhaustive_tiling_search(false);
 
   opts.set_xla_gpu_experimental_enable_triton_heroless_priority_fusion(false);
+  opts.set_xla_gpu_experimental_enable_multiply_in_dot_fusion_prologue(true);
 
   opts.set_xla_gpu_auto_spmd_partitioning_memory_budget_gb(0);
   opts.set_xla_gpu_auto_spmd_partitioning_memory_budget_ratio(1.1);
@@ -2118,6 +2119,15 @@ void MakeDebugOptionsFlags(std::vector<tsl::Flag>* flag_list,
   flag_list->push_back(tsl::Flag("xla_gpu_enable_triton_gemm_int4",
                                  noop_flag_setter<bool>, true,
                                  "[Deprecated, do not use]"));
+  flag_list->push_back(tsl::Flag(
+      "xla_gpu_experimental_enable_multiply_in_dot_fusion_prologue",
+      bool_setter_for(
+          &DebugOptions::
+              set_xla_gpu_experimental_enable_multiply_in_dot_fusion_prologue),
+      debug_options
+          ->xla_gpu_experimental_enable_multiply_in_dot_fusion_prologue(),
+      "When enabled, the multiply will be fused into dot fusion when "
+      "possible."));
   flag_list->push_back(
       tsl::Flag("xla_gpu_async_dot",
                 bool_setter_for(&DebugOptions::set_xla_gpu_async_dot),

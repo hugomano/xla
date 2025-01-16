@@ -957,6 +957,12 @@ bool IsInputWorthFusing(const HloInstruction& hlo) {
       hlo_query::AllOperandsAreParametersOrConstants(hlo)) {
     return true;
   }
+  if (hlo.opcode() == HloOpcode::kMultiply) {
+    return hlo.GetModule()
+        ->config()
+        .debug_options()
+        .xla_gpu_experimental_enable_multiply_in_dot_fusion_prologue();
+  }
   return hlo_query::AllOperandsAreParametersOrConstantsWithSingleUser(hlo);
 }
 
