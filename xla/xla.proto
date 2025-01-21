@@ -348,12 +348,6 @@ message DebugOptions {
 
   bool xla_gpu_enable_approx_costly_collectives = 305;
 
-  // If enabled, uses bf16_3way gemm to compute F32 gemm.
-  bool xla_gpu_enable_bf16_3way_gemm = 279;
-
-  // If enabled, uses bf16_6way gemm to compute F32 gemm.
-  bool xla_gpu_enable_bf16_6way_gemm = 271;
-
   // Determine the types of commands that are recorded into command buffers.
   repeated CommandBufferCmdType xla_gpu_enable_command_buffer = 258;
 
@@ -385,10 +379,6 @@ message DebugOptions {
   // Enables address computation fusion to optimize dynamic-slice and
   // dynamic-update-slice operations around library calls.
   bool xla_gpu_enable_dynamic_slice_fusion = 105;
-
-  // Experimental optimizations for SPMD-based pipeline parallelism on GPU.
-  // TODO(bchetioui): adjust this name to follow the naming convention.
-  bool xla_gpu_enable_experimental_pipeline_parallelism_opt = 351;
 
   // When true we lower the Minimum and Maximum hlos in the GPU backend such
   // that Min(NotNaN, NaN) = Min(NaN, NotNaN) = NotNaN.  In other words, if flag
@@ -512,6 +502,9 @@ message DebugOptions {
   //
   // Pre-existing block-level fusions are left unmodified.
   bool xla_gpu_experimental_enable_fusion_block_level_rewriter = 334;
+
+  // Experimental optimizations for SPMD-based pipeline parallelism on GPU.
+  bool xla_gpu_experimental_enable_pipeline_parallelism_opt = 351;
 
   // When enabled, the PriorityFusion pass will try to make Triton fusions first
   // and foremost where it is possible.
@@ -1152,8 +1145,10 @@ message DebugOptions {
   // xla_gpu_enable_heuristic_pass_configuration
   // xla_gpu_enable_dot_strength_reduction
   // xla_gpu_triton_fusion_level
+  // xla_gpu_enable_bf16_3way_gemm
+  // xla_gpu_enable_bf16_6way_gemm
   reserved 5, 117, 133, 139, 176, 178, 180, 193, 214, 194, 221, 242, 206, 320,
-      325, 326, 332, 361, 270, 229;
+      325, 326, 332, 361, 270, 229, 271, 279;
 }
 
 // Contains flags which affects the GPU compilation result.
