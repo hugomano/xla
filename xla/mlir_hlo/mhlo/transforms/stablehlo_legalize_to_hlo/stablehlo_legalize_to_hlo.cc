@@ -89,6 +89,15 @@ Attribute convertAttr(Attribute stablehloAttr) {
           mlir::dyn_cast<stablehlo::CustomCallApiVersionAttr>(stablehloAttr)) {
     RETURN_CONVERTED_ENUM_ATTR(CustomCallApiVersion);
   }
+  if (auto attr = mlir::dyn_cast<DictionaryAttr>(stablehloAttr)) {
+    SmallVector<NamedAttribute> newAttr(attr.getValue());
+    for (auto& namedAttr : newAttr) {
+      if (namedAttr.getName() == "channel_handle") {
+        namedAttr.setValue(convertAttr(namedAttr.getValue()));
+      }
+    }
+    return DictionaryAttr::get(attr.getContext(), newAttr);
+  }
   if (auto attr = mlir::dyn_cast<stablehlo::DotAlgorithmAttr>(stablehloAttr)) {
     return mhlo::DotAlgorithmAttr::get(
         attr.getContext(), attr.getLhsPrecisionType(),
