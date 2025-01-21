@@ -89,7 +89,8 @@ absl::Status ExecuteWithSameInputBuffer(
   TF_RET_CHECK(!client->addressable_devices().empty());
   auto* device0 = client->addressable_devices().front();
   TF_ASSIGN_OR_RETURN(auto buffer,
-                      client->CreateUninitializedBuffer(shape, device0));
+                      client->CreateUninitializedBuffer(
+                          shape, *device0->default_memory_space()));
   TF_ASSIGN_OR_RETURN(auto executable,
                       ToyExecutable(*client, shape, std::move(set_up_aliases)));
   return executable->Execute({{buffer.get(), buffer.get()}}, /*options=*/{})
