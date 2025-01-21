@@ -17,6 +17,7 @@ limitations under the License.
 #define XLA_SERVICE_MEMORY_SPACE_ASSIGNMENT_ALGORITHM_H_
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
 #include <list>
 #include <map>
@@ -35,6 +36,8 @@ limitations under the License.
 #endif
 #include "absl/container/flat_hash_map.h"
 #include "absl/container/flat_hash_set.h"
+#include "absl/container/inlined_vector.h"
+#include "absl/memory/memory.h"
 #include "absl/status/status.h"
 #include "absl/status/statusor.h"
 #include "absl/strings/string_view.h"
@@ -180,8 +183,15 @@ class AsynchronousCopyResource {
 
   // The constructor needs the initial resources.
   explicit AsynchronousCopyResource(absl::Span<const float> initial_resources)
-      : initial_resources_(initial_resources.begin(), initial_resources.end()),
-        delay_(initial_resources.size(), 0) {}
+      : num_resources_(initial_resources.size()),
+        initial_resources_owner_(
+            std::make_unique<float[]>(initial_resources.size())),
+        initial_resources_(initial_resources_owner_.get()),
+        delay_owner_(std::make_unique<float[]>(initial_resources.size())),
+        delay_(delay_owner_.get()) {
+    std::copy(initial_resources.begin(), initial_resources.end(),
+              initial_resources_);
+  }
 
   // Adds the given asynchronous copy and updates the current resources. CHECK
   // fails if there aren't enough resources to satisfy this copy (the caller
@@ -203,8 +213,8 @@ class AsynchronousCopyResource {
   // This is only used for debugging and testing purposes, it returns the
   // currently available resource at each logical time.
   std::vector<float> GetCurrentResources() const {
-    std::vector<float> current_resources(initial_resources_.begin(),
-                                         initial_resources_.end());
+    std::vector<float> current_resources(initial_resources_,
+                                         initial_resources_ + num_resources_);
     for (int i = 0; i < current_resources.size(); ++i) {
       current_resources[i] -= std::min(current_resources[i], delay_[i]);
     }
@@ -221,10 +231,11 @@ class AsynchronousCopyResource {
   // ConsumeResource() may modify delay_. If delay_change_map is not null,
   // for any change to delay_[i], {i, delay_[i]} will be added to
   // delay_change_map, allowing callers to undo any modifications.
-  bool ConsumeResource(
-      int64_t exclusive_start_time, int64_t end_time, float resource,
-      absl::flat_hash_map<int64_t, float>* delay_change_map = nullptr,
-      float resource_to_free = 0.0);
+  bool ConsumeResource(int64_t exclusive_start_time, int64_t end_time,
+                       float resource,
+                       absl::InlinedVector<std::pair<int64_t, float>, 4>*
+                           delay_changes = nullptr,
+                       float resource_to_free = 0.0);
 
   // Same as the public RemoveCopy except it works on the async_copies_
   // iterator. Assumes copy_it points to the last copy for its start time;
@@ -247,8 +258,11 @@ class AsynchronousCopyResource {
 #else
   std::map<int64_t, std::list<AsynchronousCopy>::iterator> async_copy_time_map_;
 #endif
-  std::vector<float> initial_resources_;
-  std::vector<float> delay_;
+  size_t num_resources_;
+  std::unique_ptr<float[]> initial_resources_owner_;
+  float* initial_resources_;  // Owned by initial_resources_owner_.
+  std::unique_ptr<float[]> delay_owner_;
+  float* delay_;  // Owned by delay_owner_.
 };
 
 // This class inherits from GlobalDecreasingSizeBestFitHeap with a notion of
