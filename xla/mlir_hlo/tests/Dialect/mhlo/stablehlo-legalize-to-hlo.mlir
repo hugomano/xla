@@ -756,6 +756,22 @@ func.func @op_custom_call_mhlo_backend_config(%arg0: tensor<16x256xbf16>) -> ten
   return %4 : tensor<16x4xbf16>
 }
 
+// -----
+
+// CHECK-LABEL: op_custom_call_channel_handle
+func.func @op_custom_call_channel_handle(%arg0: tensor<1x3xi32>, %arg1: tensor<1x4xf32>,  %arg2: tensor<2xi32>, %arg3: tensor<2xi32>, %arg4: tensor<2xi32>, %arg5: tensor<2xi32>) -> tensor<1x4xf32> {
+  // CHECK: "mhlo.custom_call"([[ARG0:%arg[0-9]+]], [[ARG1:%arg[0-9]+]], [[ARG2:%arg[0-9]+]], [[ARG3:%arg[0-9]+]], [[ARG4:%arg[0-9]+]], [[ARG5:%arg[0-9]+]]) <{
+  // CHECK-SAME: api_version = 4 : i32,
+  // CHECK-SAME: backend_config = {channel_handle = #mhlo.channel_handle<handle = 1, type = 1>,
+  // CHECK-SAME{LITERAL}: replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>},
+  // CHECK-SAME: call_target_name = "ragged_all_to_all"
+  // CHECK-SAME: }> : (tensor<1x3xi32>, tensor<1x4xf32>, tensor<2xi32>, tensor<2xi32>, tensor<2xi32>, tensor<2xi32>) -> tensor<1x4xf32>
+  %0 = stablehlo.custom_call @ragged_all_to_all(%arg0, %arg1, %arg2, %arg3, %arg4, %arg5) {api_version = 4 : i32, backend_config = {channel_handle = #stablehlo.channel_handle<handle = 1, type = 1>, replica_groups = dense<[[0, 1]]> : tensor<1x2xi64>}} : (tensor<1x3xi32>, tensor<1x4xf32>, tensor<2xi32>, tensor<2xi32>, tensor<2xi32>, tensor<2xi32>) -> tensor<1x4xf32>
+  return %0 : tensor<1x4xf32>
+}
+
+// -----
+
 // CHECK-LABEL: "op_divide"
 func.func @op_divide(%arg0: tensor<f32>, %arg1: tensor<f32>) -> tensor<f32> {
   // CHECK: "mhlo.divide"([[ARG0:%arg[0-9]+]], [[ARG1:%arg[0-9]+]]) : (tensor<f32>, tensor<f32>) -> tensor<f32>
