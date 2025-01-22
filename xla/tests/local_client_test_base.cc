@@ -31,6 +31,7 @@ limitations under the License.
 #include "xla/shape_util.h"
 #include "xla/status_macros.h"
 #include "xla/stream_executor/stream_executor_memory_allocator.h"
+#include "xla/tsl/platform/errors.h"
 #include "tsl/platform/env.h"
 #include "tsl/platform/errors.h"
 #include "tsl/platform/logging.h"
@@ -200,10 +201,10 @@ absl::StatusOr<ScopedShapedBuffer> LocalClientTestBase::ExecuteLocally(
       build_options.device_ordinal() == -1 ? 0 : build_options.device_ordinal();
   auto* stream = run_options.stream();
   if (!stream) {
-    stream = local_client_->mutable_backend()
-                 ->BorrowStream(device_ordinal)
-                 .value()
-                 .get();
+    auto stream_borrowed =
+        local_client_->mutable_backend()->BorrowStream(device_ordinal).value();
+    stream = stream_borrowed.get();
+    TF_RETURN_IF_ERROR(stream->BlockHostUntilDone());
   }
   TF_RETURN_IF_ERROR(stream->BlockHostUntilDone());
   return std::move(ret);
