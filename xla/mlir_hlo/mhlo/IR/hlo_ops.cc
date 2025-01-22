@@ -4614,6 +4614,8 @@ LogicalResult ReshapeOp::verify() {
     RankedTensorType resultType = cast<RankedTensorType>(getResult().getType());
     if (failed(verifySingleBoundedDynamicDimension(getOperation(), resultType)))
       return failure();
+    // No verification of dynamic result reshapes.
+    return success();
   }
   return hlo::verifyReshapeOp(getLoc(), getOperand(), getResult());
 }
