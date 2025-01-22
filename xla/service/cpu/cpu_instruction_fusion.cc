@@ -102,6 +102,11 @@ FusionDecision CpuInstructionFusion::ShouldFuse(HloInstruction* consumer,
     return FusionDecision::Forbid("Producer is not loop-fusible.");
   }
 
+  if (producer->opcode() == HloOpcode::kConcatenate ||
+      consumer->opcode() == HloOpcode::kConcatenate) {
+    return FusionDecision::Forbid("Concatenate fusion is inefficient.");
+  }
+
   // Cost condition: not fuse (simple, expensive producers) and (consumers who
   // reuse operand elements).
   if (producer->opcode() != HloOpcode::kFusion && is_expensive(*producer) &&
