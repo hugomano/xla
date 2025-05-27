@@ -124,7 +124,12 @@ cc_library(
             "@tsl//tsl/platform:errors",
             "@tsl//tsl/platform:status",
             "@tsl//tsl/platform:statusor",
-        ] + tf_additional_cuda_platform_deps(),
+        ] + tf_additional_cuda_platform_deps() + select({
+            ":libnvptxcompiler_support_enabled": [
+                "@local_config_cuda//cuda:nvptxcompiler",
+            ],
+            "//conditions:default": [],
+        }),
     alwayslink = True,  # Registers itself with the PlatformManager.
 )
 
