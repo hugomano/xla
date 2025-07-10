@@ -45,7 +45,7 @@ inline BufferAssigner::Colorer CollectiveColorer(bool use_user_buffers,
   return [use_user_buffers, use_nvshmem](HloAliasAnalysis* alias_analysis,
                                          const HloOrdering&) {
     static const absl::NoDestructor<absl::flat_hash_set<HloOpcode>>
-        kSupportedOpcodes({
+        kSupportedOpcodes(absl::flat_hash_set<HloOpcode>{
             HloOpcode::kAllReduce,
             HloOpcode::kAllReduceStart,
             HloOpcode::kAllReduceDone,
